@@ -17,7 +17,7 @@ import java.util.UUID
 const val DPM = 8 // dots per mm (203 dpi)
 val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
-/** Label bitmap (pure black/white). Sinhala is drawn as an image so any printer can print it. */
+/** Label bitmap (pure black/white). 3 languages stacked per row; optional rotated weight strip on the left. */
 fun renderLabel(t: Tpl): Bitmap {
     val w = t.w * DPM
     val h = t.h * DPM
@@ -28,46 +28,63 @@ fun renderLabel(t: Tpl): Bitmap {
         color = Color.BLACK
         typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
     }
-    val si = paint(true)
-    val en = paint(false)
+    val lp = paint(true)
     val v = paint(false)
-    val mx = 8f
-    val my = 6f
-    val rh = (h - 2 * my) / 4f
-    si.textSize = rh * 0.46f * t.scale
-    en.textSize = rh * 0.28f * t.scale
-    v.textSize = rh * 0.52f * t.scale
+    val ml = t.ml * DPM
+    val mr = t.mr * DPM
+    val mt = t.mt * DPM
+    val mb = t.mb * DPM
+    val rh = (h - mt - mb) / 4f
+    val pitch = rh / 3f
+    lp.textSize = pitch * 0.82f * t.scale
+    v.textSize = rh * 0.5f * t.scale
 
-    // make the two label lines fit inside one row
-    val fit = (si.fontMetrics.descent - si.fontMetrics.ascent) + (en.fontMetrics.descent - en.fontMetrics.ascent)
-    if (fit > rh) { val f = rh / fit; si.textSize *= f; en.textSize *= f }
+    // optional weight text, rotated 90° (reads bottom -> top) on the left edge
+    var cl = ml
+    if (t.wOn && t.wt.isNotBlank()) {
+        val txt = (t.wPre.trim() + " " + t.wt.trim()).trim()
+        val wp = paint(false)
+        wp.textAlign = Paint.Align.CENTER
+        wp.textSize = rh * 0.42f * t.scale
+        val len = h - mt - mb
+        val tw = wp.measureText(txt)
+        if (tw > len && tw > 0f) wp.textSize *= len / tw
+        val fm = wp.fontMetrics
+        val sw = minOf(fm.descent - fm.ascent, w * 0.2f)
+        val cx = ml + sw / 2f
+        val cy = mt + len / 2f
+        c.save()
+        c.rotate(-90f, cx, cy)
+        c.drawText(txt, cx, cy - (fm.ascent + fm.descent) / 2f, wp)
+        c.restore()
+        cl = ml + sw + 3f
+    }
 
-    // aligned columns: labels | colon | values
-    val leftW = (0..3).maxOf { maxOf(si.measureText(t.si[it]), en.measureText(t.en[it])) }
-    val colonX = mx + leftW + 4f
-    val vx = colonX + si.measureText(":") + 6f
+    val langs = listOf(t.si, t.en, t.ta)
+    var leftW = langs.maxOf { l -> l.maxOf { lp.measureText(it) } }
+    val cap = w * 0.6f - cl - 10f
+    if (leftW > cap && cap > 10f) { lp.textSize *= cap / leftW; leftW = cap }
+    val colonX = cl + leftW + 3f
+    val vx = colonX + lp.measureText(":") + 5f
     val vals = t.values()
     val vw = vals.maxOf { v.measureText(it) }
-    val avail = w - vx - mx
-    if (vw > avail && vw > 0f) v.textSize *= maxOf(avail / vw, 0.5f)
-
-    val sf = si.fontMetrics
-    val ef = en.fontMetrics
+    val avail = w - mr - vx
+    if (vw > avail && vw > 0f && avail > 10f) v.textSize *= maxOf(avail / vw, 0.5f)
     val vf = v.fontMetrics
-    val bh = (sf.descent - sf.ascent) + (ef.descent - ef.ascent)
+
     for (i in 0..3) {
-        val y0 = my + i * rh
-        val top = y0 + (rh - bh) / 2f
-        val sBase = top - sf.ascent
-        val eBase = top + (sf.descent - sf.ascent) - ef.ascent
-        c.drawText(t.si[i], mx, sBase, si); c.drawText(":", colonX, sBase, si)
-        c.drawText(t.en[i], mx, eBase, en); c.drawText(":", colonX, eBase, en)
+        val y0 = mt + i * rh
+        for (j in 0..2) {
+            val base = y0 + pitch * j + pitch * 0.82f
+            c.drawText(langs[j][i], cl, base, lp)
+            c.drawText(":", colonX, base, lp)
+        }
         c.drawText(vals[i], vx, y0 + rh / 2f - (vf.ascent + vf.descent) / 2f, v)
     }
 
     val px = IntArray(w * h)
     bmp.getPixels(px, 0, w, 0, 0, w, h)
-    for (i in px.indices) px[i] = if (Color.red(px[i]) < 160) Color.BLACK else Color.WHITE
+    for (i in px.indices) px[i] = if (Color.red(px[i]) < 175) Color.BLACK else Color.WHITE
     bmp.setPixels(px, 0, w, 0, 0, w, h)
     return bmp
 }
