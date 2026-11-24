@@ -17,7 +17,7 @@ import java.util.UUID
 const val DPM = 8 // dots per mm (203 dpi)
 val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
-/** Label bitmap (pure black/white). 3 languages stacked per row; optional rotated weight strip on the left. */
+/** Label bitmap (pure black/white): large Sinhala label, small "English/Tamil" line, aligned value column, optional rotated weight strip. */
 fun renderLabel(t: Tpl): Bitmap {
     val w = t.w * DPM
     val h = t.h * DPM
@@ -28,16 +28,18 @@ fun renderLabel(t: Tpl): Bitmap {
         color = Color.BLACK
         typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
     }
-    val lp = paint(true)
-    val v = paint(false)
+    val lp = paint(true)   // Sinhala label (large)
+    val ep = paint(true)   // English/Tamil (small)
+    val v = paint(false)   // value
     val ml = t.ml * DPM
     val mr = t.mr * DPM
     val mt = t.mt * DPM
     val mb = t.mb * DPM
-    val rh = (h - mt - mb) / 4f
-    val pitch = rh / 3f
-    lp.textSize = pitch * 0.82f * t.scale
-    v.textSize = rh * 0.5f * t.scale
+    val gap = t.sp * DPM
+    val rh = (h - mt - mb - 3 * gap) / 4f
+    lp.textSize = rh * 0.46f * t.scale
+    ep.textSize = rh * 0.26f * t.scale
+    v.textSize = rh * 0.57f * t.scale
 
     // optional weight text, rotated 90° (reads bottom -> top) on the left edge
     var cl = ml
@@ -45,7 +47,7 @@ fun renderLabel(t: Tpl): Bitmap {
         val txt = (t.wPre.trim() + " " + t.wt.trim()).trim()
         val wp = paint(false)
         wp.textAlign = Paint.Align.CENTER
-        wp.textSize = rh * 0.42f * t.scale
+        wp.textSize = rh * 0.4f * t.scale
         val len = h - mt - mb
         val tw = wp.measureText(txt)
         if (tw > len && tw > 0f) wp.textSize *= len / tw
@@ -60,10 +62,10 @@ fun renderLabel(t: Tpl): Bitmap {
         cl = ml + sw + 3f
     }
 
-    val langs = listOf(t.si, t.en, t.ta)
-    var leftW = langs.maxOf { l -> l.maxOf { lp.measureText(it) } }
+    val small = (0..3).map { listOf(t.en[it], t.ta[it]).filter { s -> s.isNotBlank() }.joinToString("/") }
+    var leftW = (0..3).maxOf { maxOf(lp.measureText(t.si[it]), ep.measureText(small[it])) }
     val cap = w * 0.6f - cl - 10f
-    if (leftW > cap && cap > 10f) { lp.textSize *= cap / leftW; leftW = cap }
+    if (leftW > cap && cap > 10f) { val f = cap / leftW; lp.textSize *= f; ep.textSize *= f; leftW = cap }
     val colonX = cl + leftW + 3f
     val vx = colonX + lp.measureText(":") + 5f
     val vals = t.values()
@@ -73,12 +75,11 @@ fun renderLabel(t: Tpl): Bitmap {
     val vf = v.fontMetrics
 
     for (i in 0..3) {
-        val y0 = mt + i * rh
-        for (j in 0..2) {
-            val base = y0 + pitch * j + pitch * 0.82f
-            c.drawText(langs[j][i], cl, base, lp)
-            c.drawText(":", colonX, base, lp)
-        }
+        val y0 = mt + i * (rh + gap)
+        val bs = y0 + lp.textSize
+        c.drawText(t.si[i], cl, bs, lp)
+        c.drawText(":", colonX, bs, lp)
+        c.drawText(small[i], cl, y0 + rh * 0.86f, ep)
         c.drawText(vals[i], vx, y0 + rh / 2f - (vf.ascent + vf.descent) / 2f, v)
     }
 

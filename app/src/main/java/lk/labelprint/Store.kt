@@ -13,6 +13,13 @@ val DF: DateTimeFormatter = DateTimeFormatter.ofPattern("uuuu MM dd").withResolv
 val TF: DateTimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm")
 fun today(): String = LocalDate.now().format(DF)
 fun plusYear(s: String): String = runCatching { LocalDate.parse(s, DF).plusYears(1).minusDays(1).format(DF) }.getOrDefault(s)
+/** Old default label texts -> new short forms (so saved templates keep working). */
+val MIG = mapOf(
+    "නිශ්. දිනය" to "නි.පා.දි", "ක.ඉ.දිනය" to "ක.ඉ.දි", "කාණ්ඩ අං." to "කා.අං.",
+    "Mfd Date" to "Mfd", "Exp Date" to "Exp", "Batch No" to "Batch", "Price Rs" to "Price",
+    "உற்பத்தி திகதி" to "உ.தி.", "காலாவதி திகதி" to "கா.தி.", "தொகுதி இல." to "தொ.இல.", "விலை ரூ." to "விலை",
+)
+fun mig(x: String): String = MIG[x] ?: x
 fun isDate(s: String): Boolean = runCatching { LocalDate.parse(s, DF) }.isSuccess
 fun fmtTime(ts: Long): String = Instant.ofEpochMilli(ts).atZone(ZoneId.systemDefault()).format(TF)
 
@@ -23,10 +30,10 @@ data class Tpl(
     val batch: String = "",
     val price: String = "",
     val w: Int = 30, val h: Int = 20, val gap: Int = 2, val scale: Float = 1f,
-    val ml: Float = 1.5f, val mr: Float = 1.5f, val mt: Float = 1f, val mb: Float = 1f,
-    val si: List<String> = listOf("නි.පා.දි", "ක.ඉ.දිනය", "කාණ්ඩ අං.", "මිල රු."),
-    val en: List<String> = listOf("Mfd Date", "Exp Date", "Batch No", "Price Rs"),
-    val ta: List<String> = listOf("உற்பத்தி திகதி", "காலாவதி திகதி", "தொகுதி இல.", "விலை ரூ."),
+    val ml: Float = 1.5f, val mr: Float = 1f, val mt: Float = 0.5f, val mb: Float = 0.5f, val sp: Float = 0.5f,
+    val si: List<String> = listOf("නි.පා.දි", "ක.ඉ.දි", "කා.අං.", "මිල රු."),
+    val en: List<String> = listOf("Mfd", "Exp", "Batch", "Price"),
+    val ta: List<String> = listOf("உ.தி.", "கா.தி.", "தொ.இல.", "விலை"),
     val wOn: Boolean = false, val wt: String = "", val wPre: String = "ශුද්ධ බර",
 ) {
     fun values() = listOf(mfd, exp, batch, price)
@@ -37,7 +44,7 @@ data class Tpl(
     fun toJson(): JSONObject = JSONObject()
         .put("name", name).put("mfd", mfd).put("exp", exp).put("batch", batch).put("price", price)
         .put("w", w).put("h", h).put("gap", gap).put("scale", scale.toDouble())
-        .put("ml", ml.toDouble()).put("mr", mr.toDouble()).put("mt", mt.toDouble()).put("mb", mb.toDouble())
+        .put("sp", sp.toDouble()).put("ml", ml.toDouble()).put("mr", mr.toDouble()).put("mt", mt.toDouble()).put("mb", mb.toDouble())
         .put("si", JSONArray(si)).put("en", JSONArray(en)).put("ta", JSONArray(ta))
         .put("wOn", wOn).put("wt", wt).put("wPre", wPre)
 
@@ -51,8 +58,8 @@ data class Tpl(
                 o.optString("name"), o.optString("mfd", d.mfd), o.optString("exp", d.exp),
                 o.optString("batch"), o.optString("price"),
                 o.optInt("w", 30), o.optInt("h", 20), o.optInt("gap", 2), f("scale", 1f),
-                f("ml", d.ml), f("mr", d.mr), f("mt", d.mt), f("mb", d.mb),
-                l("si", d.si).map { if (it == "නිශ්. දිනය") "නි.පා.දි" else it }, l("en", d.en), l("ta", d.ta),
+                f("ml", d.ml), f("mr", d.mr), f("mt", d.mt), f("mb", d.mb), f("sp", d.sp),
+                l("si", d.si).map(::mig), l("en", d.en).map(::mig), l("ta", d.ta).map(::mig),
                 o.optBoolean("wOn", false), o.optString("wt"), o.optString("wPre", d.wPre)
             )
         }

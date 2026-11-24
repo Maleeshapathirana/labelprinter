@@ -106,10 +106,10 @@ fun NumField(label: String, v: Int, lo: Int, hi: Int, mod: Modifier, on: (Int) -
 }
 
 @Composable
-fun MarginSlider(label: String, v: Float, on: (Float) -> Unit) {
+fun MarginSlider(label: String, v: Float, hi: Float = 6f, on: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.width(54.dp), fontSize = 13.sp)
-        Slider(v, { on((it * 2).roundToInt() / 2f) }, Modifier.weight(1f), valueRange = 0f..6f, steps = 11)
+        Slider(v, { on((it * 2).roundToInt() / 2f) }, Modifier.weight(1f), valueRange = 0f..hi, steps = (hi * 2).toInt() - 1)
         Text("$v mm", Modifier.width(54.dp), fontSize = 13.sp, textAlign = TextAlign.End)
     }
 }
@@ -314,11 +314,12 @@ fun Root(ctx: Context, store: Store, cfg: Cfg, setCfg: (Cfg) -> Unit) {
                     }
                     Text("අකුරු ප්‍රමාණය ${(t.scale * 100).toInt()}%", fontSize = 13.sp)
                     Slider(t.scale, { t = t.copy(scale = it) }, valueRange = 0.7f..1.3f)
-                    Text("Margins (mm)", fontWeight = FontWeight.Bold)
+                    Text("Margins & section space (mm)", fontWeight = FontWeight.Bold)
                     MarginSlider("Left", t.ml) { t = t.copy(ml = it) }
                     MarginSlider("Right", t.mr) { t = t.copy(mr = it) }
                     MarginSlider("Top", t.mt) { t = t.copy(mt = it) }
                     MarginSlider("Bottom", t.mb) { t = t.copy(mb = it) }
+                    MarginSlider("Space", t.sp, 2f) { t = t.copy(sp = it) }
                     Text("Label text (සිංහල · English · தமிழ்)", fontWeight = FontWeight.Bold)
                     val small = TextStyle(fontSize = 13.sp)
                     for (i in 0..3) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
